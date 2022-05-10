@@ -1,0 +1,13 @@
+/generate_attributes/pretrained_model
+/data
+/__pycache__
+/generate_attributes/generated_attributes
+/generate_attributes/generated_attributes_glove
+*.log
+*.pth
+*.png
+*.out 
+*.mat 
+*.npy
+
+temp.py
