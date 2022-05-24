@@ -41,7 +41,6 @@ parser.add_argument(
     "--attr_num", type=int, default=0, help="num of generative attribute for training"
 )
 parser.add_argument("--output", type=str, default="./output/", help="Output directory")
-parser.add_argument("--alpha", type=float, default="0.0")
 parser.add_argument("--cent_w", type=float, default="0.0", help="Center loss weight")
 parser.add_argument("--seed", type=int, default=-1)
 parser.add_argument("--epochs", type=int, default=200)
@@ -75,36 +74,6 @@ def export_best(args, best):
             "{}\t{}\t{}\t{}\t{}\n".format(args.dataset, args.seed, args.attr_num, args.cent_w, best)
         )
 
-def eval(model, loader):
-
-    mse_loss = nn.MSELoss()
-    model.eval()
-    with torch.set_grad_enabled(False):
-
-        total_num = 0
-        running_loss = 0.0
-
-        # Iterate over data.
-        for visual_batch, attr_batch, label_batch in loader:
-            visual_batch = visual_batch.float().cuda()
-
-            attr_batch = (
-                attr_batch.float()
-                .reshape(visual_batch.shape[0], 1, 1, attr_batch.shape[1])
-                .cuda()
-            )
-
-            out_visual = model(attr_batch)  # semantic -> visual space
-
-            loss = mse_loss(out_visual, visual_batch)
-
-            # statistics loss and acc every epoch
-            running_loss += loss.item() * visual_batch.shape[0]
-
-            total_num += visual_batch.shape[0]
-
-    return running_loss / total_num
-
 
 def train_and_test(loader, dataset, args):
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -137,9 +106,7 @@ def train_and_test(loader, dataset, args):
         .float()
         .cuda()
     )
-    cluster = np.load(f"data/cluster/{args.dataset}_cluster.npy")
     # hyperparameters
-    alpha = args.alpha  # 0.2-64.4; 0.5 - 64.9 ; 0.7-70.3;0.8-72.2; 1-68.29.
     c_w = args.cent_w  # for center_loss. 0.003 in paper
     lr = args.lr
     lr_cl = 0.5  # 0.5 in paper
@@ -159,7 +126,6 @@ def train_and_test(loader, dataset, args):
     history = {
         "Acc_ZSL": [],
         "Loss_attr": [],
-        "Loss_cluster": [],
         "Loss_center": [],
         "Loss_Total": [],
     }
@@ -206,8 +172,6 @@ def train_and_test(loader, dataset, args):
 
             scheduler.step()
             model.eval()
-
-            # early_stopping(eval(model, eval_loader), model)
 
             # if early_stopping.early_stop:
             #     print("Early stopping")
@@ -270,8 +234,6 @@ def train_and_test(loader, dataset, args):
                 )
             )
 
-            history["Loss_cluster"].append(0)
-
             print("lr:", opt.param_groups[0]["lr"])
             h_line = "gzsl: seen={:.4f}, unseen={:.4f}, h={:.4f}".format(
                 acc_seen_gzsl, acc_unseen_gzsl, H
@@ -317,28 +279,7 @@ def main():
     train_loader = DataLoader(
         dataset=dataset_train, batch_size=100, shuffle=True, num_workers=2
     )
-    # data_length = dataset.train_feature.shape[0]
-    # eval_ratio = 0.2
-    # dataset_eval = TensorDataset(
-    #     torch.from_numpy(
-    #         dataset.train_feature[
-    #             random.sample(range(data_length), int(eval_ratio * data_length))
-    #         ]
-    #     ),
-    #     torch.from_numpy(
-    #         dataset.train_att[
-    #             random.sample(range(data_length), int(eval_ratio * data_length))
-    #         ]
-    #     ),
-    #     torch.from_numpy(
-    #         dataset.train_label[
-    #             random.sample(range(data_length), int(eval_ratio * data_length))
-    #         ]
-    #     ),
-    # )
-    # eval_loader = DataLoader(
-    #     dataset=dataset_eval, batch_size=100, shuffle=False, num_workers=0
-    # )
+    
     train_and_test(train_loader, dataset, args)
 
 

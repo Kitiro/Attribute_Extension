@@ -124,11 +124,8 @@ def export_log(log_text, path):
 
 
 class CenterLoss(nn.Module):
-    """Center loss.
-
-    Reference:
-    Wen et al. A Discriminative Feature Learning Approach for Deep Face Recognition. ECCV 2016.
-
+    """Modified Center loss.
+    
     Args:
         num_classes (int): number of classes.
         feat_dim (int): feature dimension.
@@ -139,7 +136,6 @@ class CenterLoss(nn.Module):
         self.num_classes = num_classes
         self.feat_dim = feat_dim
         self.use_gpu = use_gpu
-
         if self.use_gpu:
             self.centers = nn.Parameter(
                 torch.randn(self.num_classes, self.feat_dim).cuda()
@@ -147,41 +143,78 @@ class CenterLoss(nn.Module):
         else:
             self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim))
 
+    def threshold_loss(self, a, b):
+        return ((a-b)**2).clamp(min=1e-12, max=1).sum() / (len(a)*2)
+        
     def forward(self, x, labels):
         """
         Args:
             x: feature matrix with shape (batch_size, feat_dim).
             labels: ground truth labels with shape (batch_size).
         """
-        batch_size = x.size(0)
-        distmat = (
-            torch.pow(x, 2)
-            .sum(dim=1, keepdim=True)
-            .expand(batch_size, self.num_classes)
-            + torch.pow(self.centers, 2)
-            .sum(dim=1, keepdim=True)
-            .expand(self.num_classes, batch_size)
-            .t()
-        )
-
-        classes = torch.arange(self.num_classes).long()
-
-        if self.use_gpu:
-            distmat = distmat.cuda()
-            classes = classes.cuda()
-
-        distmat.addmm_(
-            1, -2, x, self.centers.t()
-        )  # 1*distmat + (-2)*(x*self.centers'T)
-
-        labels = labels.unsqueeze(1).expand(batch_size, self.num_classes)
-
-        mask = labels.eq(classes.expand(batch_size, self.num_classes))
-
-        dist = distmat * mask.float()
-        loss = dist.clamp(min=1e-12, max=1e12).sum() / batch_size
-
+        center_feats = self.centers[labels.squeeze()]
+        loss = self.threshold_loss(x, center_feats)
         return loss
+
+# class CenterLoss(nn.Module):
+#     """Center loss.
+
+#     Reference:
+#     Wen et al. A Discriminative Feature Learning Approach for Deep Face Recognition. ECCV 2016.
+
+#     Args:
+#         num_classes (int): number of classes.
+#         feat_dim (int): feature dimension.
+#     """
+
+#     def __init__(self, num_classes=10, feat_dim=2, use_gpu=True):
+#         super(CenterLoss, self).__init__()
+#         self.num_classes = num_classes
+#         self.feat_dim = feat_dim
+#         self.use_gpu = use_gpu
+
+#         if self.use_gpu:
+#             self.centers = nn.Parameter(
+#                 torch.randn(self.num_classes, self.feat_dim).cuda()
+#             )
+#         else:
+#             self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim))
+
+#     def forward(self, x, labels):
+#         """
+#         Args:
+#             x: feature matrix with shape (batch_size, feat_dim).
+#             labels: ground truth labels with shape (batch_size).
+#         """
+#         batch_size = x.size(0)
+#         distmat = (
+#             torch.pow(x, 2)
+#             .sum(dim=1, keepdim=True)
+#             .expand(batch_size, self.num_classes)
+#             + torch.pow(self.centers, 2)
+#             .sum(dim=1, keepdim=True)
+#             .expand(self.num_classes, batch_size)
+#             .t()
+#         )
+
+#         classes = torch.arange(self.num_classes).long()
+
+#         if self.use_gpu:
+#             distmat = distmat.cuda()
+#             classes = classes.cuda()
+
+#         distmat.addmm_(
+#             1, -2, x, self.centers.t()
+#         )  # 1*distmat + (-2)*(x*self.centers'T)
+
+#         labels = labels.unsqueeze(1).expand(batch_size, self.num_classes)
+
+#         mask = labels.eq(classes.expand(batch_size, self.num_classes))
+
+#         dist = distmat * mask.float()
+#         loss = dist.clamp(min=1e-12, max=1e12).sum() / batch_size
+
+#         return loss
 
 
 class EarlyStopping:
