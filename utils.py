@@ -144,7 +144,7 @@ class CenterLoss(nn.Module):
             self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim))
 
     def threshold_loss(self, a, b):
-        return ((a-b)**2).clamp(min=1e-12, max=1).sum() / (len(a)*2)
+        return ((a-b)**2).clamp(min=1e-12, max=0.1).sum() / (len(a)*2)
         
     def forward(self, x, labels):
         """
