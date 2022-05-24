@@ -9,5 +9,7 @@
 *.out 
 *.mat 
 *.npy
+*.txt
+*.sh
 
 temp.py
